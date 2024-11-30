@@ -53,13 +53,19 @@ func handleConn(conn net.Conn) {
 			errorCode = 35
 		}
 		binary.Write(res, binary.BigEndian, uint16(errorCode))
-		binary.Write(res, binary.BigEndian, byte(2))
-		binary.Write(res, binary.BigEndian, uint16(18))
-		binary.Write(res, binary.BigEndian, uint16(3))
-		binary.Write(res, binary.BigEndian, uint16(4))
-		res.Write(TAG_BUFFER)
-		binary.Write(res, binary.BigEndian, uint32(0))
-		res.Write(TAG_BUFFER)
+		if req.ApiKey == 18 {
+			binary.Write(res, binary.BigEndian, byte(3))
+			binary.Write(res, binary.BigEndian, uint16(18))
+			binary.Write(res, binary.BigEndian, uint16(3))
+			binary.Write(res, binary.BigEndian, uint16(4))
+			res.Write(TAG_BUFFER)
+			binary.Write(res, binary.BigEndian, uint16(75))
+			binary.Write(res, binary.BigEndian, uint16(0))
+			binary.Write(res, binary.BigEndian, uint16(0))
+			res.Write(TAG_BUFFER)
+			binary.Write(res, binary.BigEndian, uint32(0))
+			res.Write(TAG_BUFFER)
+		}
 		binary.Write(conn, binary.BigEndian, uint32(res.Len()))
 		io.Copy(conn, res)
 	}
