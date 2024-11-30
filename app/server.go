@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"net"
 	"os"
@@ -21,7 +22,6 @@ func main() {
 	}
 	defer l.Close()
 
-	fmt.Println("Conneted")
 	conn, err := l.Accept()
 	if err != nil {
 		fmt.Println("Error accepting connection: ", err.Error())
@@ -36,6 +36,18 @@ func main() {
 		os.Exit(1)
 	}
 
+	request_api_version := binary.BigEndian.Uint16(buff[6:8])
+
+	if int16(request_api_version) > 4 || int16(request_api_version) < 0 {
+
+		resp := make([]byte, 16)
+		copy(resp, []byte{0, 0, 0, 0})
+		copy(resp[4:8], buff[8:12])
+		copy(resp[8:10], []byte{0, 35})
+
+		conn.Write(resp)
+		return
+	}
 	resp := make([]byte, 8)
 	copy(resp, []byte{0, 0, 0, 0})
 	copy(resp[4:], buff[8:12])
