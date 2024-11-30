@@ -28,5 +28,16 @@ func main() {
 		os.Exit(1)
 	}
 	defer conn.Close()
-	conn.Write([]byte{0, 0, 0, 0, 0, 0, 0, 7})
+
+	buff := make([]byte, 1024)
+	_, err = conn.Read(buff)
+	if err != nil {
+		fmt.Println("Failed to read from connection", err.Error())
+		os.Exit(1)
+	}
+
+	resp := make([]byte, 8)
+	copy(resp, []byte{0, 0, 0, 0})
+	copy(resp[4:], buff[8:12])
+	conn.Write(resp)
 }
