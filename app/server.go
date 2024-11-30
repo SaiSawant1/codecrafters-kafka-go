@@ -20,7 +20,7 @@ func main() {
 		os.Exit(1)
 	}
 	conn, err := l.Accept()
-	conn.Write([]byte("00 00 00 00\n00 00 00 07"))
+	conn.Write([]byte{0, 0, 0, 0, 0, 0, 7})
 	if err != nil {
 		fmt.Println("Error accepting connection: ", err.Error())
 		os.Exit(1)
