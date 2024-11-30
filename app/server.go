@@ -36,20 +36,31 @@ func main() {
 		os.Exit(1)
 	}
 
-	request_api_version := binary.BigEndian.Uint16(buff[6:8])
+	length := []byte{0, 0, 0, 19}
 
-	if int16(request_api_version) > 4 || int16(request_api_version) < 0 {
+	api_version := buff[6:8]
 
-		resp := make([]byte, 16)
-		copy(resp, []byte{0, 0, 0, 0})
-		copy(resp[4:8], buff[8:12])
-		copy(resp[8:10], []byte{0, 35})
+	correlation_id := buff[8:12]
 
-		conn.Write(resp)
-		return
+	var version_error []byte
+
+	switch binary.BigEndian.Uint16(api_version) {
+
+	case 0, 1, 2, 3, 4:
+		version_error = []byte{0, 0}
+	default:
+		version_error = []byte{0, 35}
+
 	}
-	resp := make([]byte, 8)
-	copy(resp, []byte{0, 0, 0, 0})
-	copy(resp[4:], buff[8:12])
-	conn.Write(resp)
+
+	res := append(length, correlation_id...)
+	res = append(res, version_error...)
+	_, err = conn.Write(res)
+	if err != nil {
+		fmt.Println("Failed to read from connection", err.Error())
+		os.Exit(1)
+	}
+
+	ret_key := []byte{2, 0, 18, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0}
+	conn.Write(ret_key)
 }
