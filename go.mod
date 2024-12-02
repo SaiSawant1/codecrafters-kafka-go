@@ -9,3 +9,5 @@
 module github.com/codecrafters-io/kafka-starter-go
 
 go 1.22
+
+require github.com/gofrs/uuid v4.4.0+incompatible
