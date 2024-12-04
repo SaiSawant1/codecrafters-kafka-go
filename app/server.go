@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -34,39 +35,51 @@ func startServer() {
 			fmt.Println("Error accepting connection: ", err.Error())
 			os.Exit(1)
 		}
-		go handleConn(conn)
+		go handleConn(&conn)
 	}
 
 }
 
-func handleConn(conn net.Conn) {
+func handleConn(conn *net.Conn) {
 	for {
-		var reqData bytes.Buffer
-		n, err := io.Copy(&reqData, conn)
-		if err != nil {
-			conn.Close()
-			return
-		} else if n == 0 {
+		buf := make([]byte, 1024)
+		n, err := (*conn).Read(buf)
+		if n == 0 {
 			continue
 		}
-		req, err := request.NewRequestFromData(reqData)
 		if err != nil {
-			log.Fatalln("Failed to parse request")
-			conn.Close()
+			log.Println("ERROR!", err.Error())
+			(*conn).Close()
 			return
 		}
 
-		res, err := response.CreateResponse(req)
+		reqData := bytes.NewBuffer(buf[:n])
+		req, err := request.Deserialize(reqData)
 		if err != nil {
-			log.Fatalln("Failed to create response from request")
-			conn.Close()
+			if err.Error() == errors.ErrUnsupported.Error() {
+				errorRes := response.GetErrrorResponse(req)
+
+				(*conn).Write(errorRes)
+				continue
+			}
+			if err == io.EOF {
+				fmt.Println("EOF!EOF", err.Error())
+				continue
+			}
+			fmt.Println("ERROR!!!!", err.Error())
+		}
+		fmt.Println(req)
+		res, err := response.Serialize(req)
+		if err != nil {
+			log.Fatalf("Failed to create response from request %s\n", err.Error())
+			(*conn).Close()
 			return
 		}
 
-		_, err = conn.Write(res)
+		_, err = (*conn).Write(res)
 		if err != nil {
 			log.Fatalln("Failed to write to client")
-			conn.Close()
+			(*conn).Close()
 			return
 		}
 	}

@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestNewReqFromConn(t *testing.T) {
+func TestDeserailize(t *testing.T) {
 	TestReq := Request{
 		ApiKey:        75,
 		ApiVersion:    0,
@@ -44,7 +44,7 @@ func TestNewReqFromConn(t *testing.T) {
 	binary.Write(&buf, binary.BigEndian, uint8(0xff)) // Cursor: Null
 	binary.Write(&buf, binary.BigEndian, uint8(0))    // Empty Tagged Field Array
 
-	req, err := NewRequestFromData(buf)
+	req, err := Deserialize(&buf)
 	if err != nil {
 		t.Errorf("Failed to get Request")
 	}

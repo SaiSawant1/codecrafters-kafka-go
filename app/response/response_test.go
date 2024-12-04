@@ -43,7 +43,7 @@ func TestNewResponse(t *testing.T) {
 		TopicArray:    []request.Topic{request.Topic{TopicName: "foo"}},
 	}
 
-	res, err := CreateResponse(testReq)
+	res, err := Serialize(testReq)
 	if err != nil {
 		t.FailNow()
 		return

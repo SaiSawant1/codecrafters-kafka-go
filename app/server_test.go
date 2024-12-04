@@ -80,14 +80,14 @@ func TestHandleConn(t *testing.T) {
 
 	testRequestMessage := ConstructEncodedMessage()
 
-	req, err := request.NewRequestFromData(testRequestMessage)
+	req, err := request.Deserialize(&testRequestMessage)
 	if err != nil {
 		t.Errorf("Failed to get Request")
 	}
 
 	desiredResponse := ConstructDesidredMessage()
 
-	res, err := response.CreateResponse(req)
+	res, err := response.Serialize(req)
 	if err != nil {
 		t.FailNow()
 		return
