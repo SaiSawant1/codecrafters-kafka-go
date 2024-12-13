@@ -5,21 +5,30 @@ import (
 	"encoding/binary"
 )
 
-func ReadUINT8(reqField *uint8, data *bytes.Buffer) error {
-	if err := binary.Read(data, binary.BigEndian, reqField); err != nil {
+func ReadUINT8(dataField *uint8, data *bytes.Buffer) error {
+	if err := binary.Read(data, binary.BigEndian, dataField); err != nil {
 		return err
 	}
 
 	return nil
 }
-func ReadUINT16(reqField *uint16, data *bytes.Buffer) error {
-	if err := binary.Read(data, binary.BigEndian, reqField); err != nil {
+
+func ReadUINT16(dataField *uint16, data *bytes.Buffer) error {
+	if err := binary.Read(data, binary.BigEndian, dataField); err != nil {
 		return err
 	}
 	return nil
 }
-func ReadUINT32(reqField *uint32, data *bytes.Buffer) error {
-	if err := binary.Read(data, binary.BigEndian, reqField); err != nil {
+
+func ReadUINT32(dataField *uint32, data *bytes.Buffer) error {
+	if err := binary.Read(data, binary.BigEndian, dataField); err != nil {
+		return err
+	}
+	return nil
+}
+
+func ReadUINT64(dataField *uint64, data *bytes.Buffer) error {
+	if err := binary.Read(data, binary.BigEndian, dataField); err != nil {
 		return err
 	}
 	return nil

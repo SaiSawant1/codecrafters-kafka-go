@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 
+	metadata "github.com/codecrafters-io/kafka-starter-go/app/meta-data"
 	"github.com/codecrafters-io/kafka-starter-go/app/request"
 	"github.com/codecrafters-io/kafka-starter-go/app/response"
 )
@@ -29,6 +30,7 @@ func startServer() {
 		fmt.Println("Failed to bind to port 9092")
 		os.Exit(1)
 	}
+	metadata.SetClusterTopics()
 	for {
 		conn, err := l.Accept()
 		if err != nil {
@@ -48,7 +50,6 @@ func handleConn(conn *net.Conn) {
 			continue
 		}
 		if err != nil {
-			log.Println("ERROR!", err.Error())
 			(*conn).Close()
 			return
 		}
@@ -63,12 +64,9 @@ func handleConn(conn *net.Conn) {
 				continue
 			}
 			if err == io.EOF {
-				fmt.Println("EOF!EOF", err.Error())
 				continue
 			}
-			fmt.Println("ERROR!!!!", err.Error())
 		}
-		fmt.Println(req)
 		res, err := response.Serialize(req)
 		if err != nil {
 			log.Fatalf("Failed to create response from request %s\n", err.Error())

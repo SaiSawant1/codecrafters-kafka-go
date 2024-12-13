@@ -3,8 +3,8 @@ package response
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 
+	metadata "github.com/codecrafters-io/kafka-starter-go/app/meta-data"
 	"github.com/codecrafters-io/kafka-starter-go/app/request"
 	"github.com/gofrs/uuid"
 )
@@ -56,7 +56,7 @@ func SerializeVersion0(req request.Request) ([]byte, error) {
 	if err := binary.Write(&header, binary.BigEndian, req.CorrelationID); err != nil {
 		return []byte{}, err
 	}
-	if err := binary.Write(&header, binary.BigEndian, uint8(0)); err != nil {
+	if err := binary.Write(&header, binary.BigEndian, uint8(0x00)); err != nil {
 		return []byte{}, err
 	}
 
@@ -73,42 +73,110 @@ func SerializeVersion0(req request.Request) ([]byte, error) {
 	}
 	// Encode Topic
 	for i := 0; i < len(req.TopicArray); i++ {
-		// Error Code
-		if err := binary.Write(&body, binary.BigEndian, uint16(3)); err != nil {
-			return []byte{}, err
-		}
-		// Topic
-		// Topic Length 1 byte
+
 		topicNameLength := len(req.TopicArray[i].TopicName)
 		topicName := req.TopicArray[i].TopicName
+
+		clusterTopic := metadata.GetClusterTopic(topicName)
+
+		if clusterTopic.ErrorCode == 3 {
+			if err := binary.Write(&body, binary.BigEndian, uint16(0x0003)); err != nil {
+				return []byte{}, err
+			}
+		} else {
+			if err := binary.Write(&body, binary.BigEndian, uint16(0x0000)); err != nil {
+				return []byte{}, err
+			}
+		}
+
 		if err := binary.Write(&body, binary.BigEndian, uint8(topicNameLength+1)); err != nil {
 			return []byte{}, err
 		}
 		body.WriteString(string(topicName))
 
-		nullUUID := uuid.UUID{}
-		if err := binary.Write(&body, binary.BigEndian, nullUUID.Bytes()); err != nil {
-			return []byte{}, err
-		}
-		if err := binary.Write(&body, binary.BigEndian, int8(0x00)); err != nil {
-			return []byte{}, err
-		}
-		if err := binary.Write(&body, binary.BigEndian, int8(0x01)); err != nil {
+		if clusterTopic.ErrorCode == 3 {
 
+			nullUUID := uuid.UUID{}
+			if err := binary.Write(&body, binary.BigEndian, nullUUID.Bytes()); err != nil {
+				return []byte{}, err
+			}
+
+		} else {
+			if err := binary.Write(&body, binary.BigEndian, clusterTopic.TopicId); err != nil {
+				return []byte{}, err
+			}
+		}
+		// Is internal
+		if err := binary.Write(&body, binary.BigEndian, uint8(0x00)); err != nil {
 			return []byte{}, err
 		}
+
+		// Partition array
+		partionsLength := len(clusterTopic.Partitions)
+		if partionsLength == 0 {
+			if err := binary.Write(&body, binary.BigEndian, uint8(0x01)); err != nil {
+				return []byte{}, err
+			}
+		} else {
+
+			if err := binary.Write(&body, binary.BigEndian, uint8(partionsLength+1)); err != nil {
+				return []byte{}, err
+			}
+
+			for i := range partionsLength {
+				partition := clusterTopic.Partitions[i]
+				binary.Write(&body, binary.BigEndian, uint16(0x0000))
+				binary.Write(&body, binary.BigEndian, uint32(partition.PartitionIndex))
+				binary.Write(&body, binary.BigEndian, uint32(partition.LeaderID))
+				binary.Write(&body, binary.BigEndian, uint32(partition.LeaderEpoch))
+
+				replicaArrayLength := len(partition.ReplicaNodeIDs)
+				binary.Write(&body, binary.BigEndian, uint8(replicaArrayLength+1))
+				for _, replicaNode := range partition.ReplicaNodeIDs {
+					binary.Write(&body, binary.BigEndian, replicaNode)
+				}
+
+				inSyncReplicaLen := len(partition.InsyncReplicaNodeIDs)
+				binary.Write(&body, binary.BigEndian, uint8(inSyncReplicaLen+1))
+				for _, inSyncReplica := range partition.InsyncReplicaNodeIDs {
+					binary.Write(&body, binary.BigEndian, inSyncReplica)
+				}
+
+				eligibleLeaderReplicaNodeIDs := len(partition.EligibleLeaderReplicaNodeIDs)
+				binary.Write(&body, binary.BigEndian, uint8(eligibleLeaderReplicaNodeIDs+1))
+				for _, eligibleLeaderReplicaNodeID := range partition.EligibleLeaderReplicaNodeIDs {
+					binary.Write(&body, binary.BigEndian, eligibleLeaderReplicaNodeID)
+				}
+
+				lastKnownEligibleLeaderReplicaNodeIDs := len(partition.LastKnownEligibleLeaderReplicaNodeIDs)
+				binary.Write(&body, binary.BigEndian, uint8(lastKnownEligibleLeaderReplicaNodeIDs+1))
+				for _, lastKnownEligibleLeaderReplicaNodeID := range partition.LastKnownEligibleLeaderReplicaNodeIDs {
+					binary.Write(&body, binary.BigEndian, lastKnownEligibleLeaderReplicaNodeID)
+				}
+
+				offlineReplicaNodes := len(partition.OfflineReplicaNodeIDs)
+				binary.Write(&body, binary.BigEndian, uint8(offlineReplicaNodes+1))
+				for _, offlineReplicaNode := range partition.OfflineReplicaNodeIDs {
+					binary.Write(&body, binary.BigEndian, offlineReplicaNode)
+				}
+			}
+			binary.Write(&body, binary.BigEndian, uint8(0x00))
+		}
+
+		// Topic Authorized
 		if err := binary.Write(&body, binary.BigEndian, uint32(0x00000df8)); err != nil {
 			return []byte{}, err
 		}
-
-		if err := binary.Write(&body, binary.BigEndian, uint8(0)); err != nil {
+		// Tag buffer
+		if err := binary.Write(&body, binary.BigEndian, uint8(0x00)); err != nil {
 			return []byte{}, err
 		}
 	}
+
 	if err := binary.Write(&body, binary.BigEndian, uint8(0xff)); err != nil {
 		return []byte{}, err
 	}
-	if err := binary.Write(&body, binary.BigEndian, uint8(0)); err != nil {
+	if err := binary.Write(&body, binary.BigEndian, uint8(0x00)); err != nil {
 		return []byte{}, err
 	}
 
@@ -117,8 +185,6 @@ func SerializeVersion0(req request.Request) ([]byte, error) {
 	binary.Write(&response, binary.BigEndian, uint32(messageLength))
 	binary.Write(&response, binary.BigEndian, header.Bytes())
 	binary.Write(&response, binary.BigEndian, body.Bytes())
-
-	fmt.Println(response.Bytes())
 
 	return response.Bytes(), nil
 }
@@ -157,80 +223,4 @@ func SerializeVersion4(req request.Request) ([]byte, error) {
 	binary.Write(&response, binary.BigEndian, responseHeader.Bytes())
 	binary.Write(&response, binary.BigEndian, responseBody.Bytes())
 	return response.Bytes(), nil
-}
-
-func CreateResponse(req request.Request) ([]byte, error) {
-
-	var response bytes.Buffer
-
-	var header bytes.Buffer
-
-	// Header
-	if err := binary.Write(&header, binary.BigEndian, req.CorrelationID); err != nil {
-		return []byte{}, err
-	}
-	if err := binary.Write(&header, binary.BigEndian, uint8(0)); err != nil {
-		return []byte{}, err
-	}
-
-	// Body
-	var body bytes.Buffer
-
-	// Throttle Time
-	if err := binary.Write(&body, binary.BigEndian, uint32(0)); err != nil {
-		return []byte{}, err
-	}
-	// Topic Length
-	if err := binary.Write(&body, binary.BigEndian, uint8(len(req.TopicArray)+1)); err != nil {
-		return []byte{}, err
-	}
-	// Encode Topic
-	for i := 0; i < len(req.TopicArray); i++ {
-		// Error Code
-		if err := binary.Write(&body, binary.BigEndian, uint16(3)); err != nil {
-			return []byte{}, err
-		}
-		// Topic
-		// Topic Length 1 byte
-		topicNameLength := len(req.TopicArray[i].TopicName)
-		topicName := req.TopicArray[i].TopicName
-		if err := binary.Write(&body, binary.BigEndian, uint8(topicNameLength+1)); err != nil {
-			return []byte{}, err
-		}
-		body.WriteString(string(topicName))
-
-		nullUUID := uuid.UUID{}
-		if err := binary.Write(&body, binary.BigEndian, nullUUID.Bytes()); err != nil {
-			return []byte{}, err
-		}
-		if err := binary.Write(&body, binary.BigEndian, int8(0x00)); err != nil {
-			return []byte{}, err
-		}
-		if err := binary.Write(&body, binary.BigEndian, int8(0x01)); err != nil {
-
-			return []byte{}, err
-		}
-		if err := binary.Write(&body, binary.BigEndian, uint32(0x00000df8)); err != nil {
-			return []byte{}, err
-		}
-
-		if err := binary.Write(&body, binary.BigEndian, uint8(0)); err != nil {
-			return []byte{}, err
-		}
-	}
-	if err := binary.Write(&body, binary.BigEndian, uint8(0xff)); err != nil {
-		return []byte{}, err
-	}
-	if err := binary.Write(&body, binary.BigEndian, uint8(0)); err != nil {
-		return []byte{}, err
-	}
-
-	messageLength := len(header.Bytes()) + len(body.Bytes())
-
-	binary.Write(&response, binary.BigEndian, uint32(messageLength))
-	binary.Write(&response, binary.BigEndian, header.Bytes())
-	binary.Write(&response, binary.BigEndian, body.Bytes())
-
-	return response.Bytes(), nil
-
 }

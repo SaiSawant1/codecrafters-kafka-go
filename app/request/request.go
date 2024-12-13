@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"fmt"
-	"log"
 
 	"github.com/codecrafters-io/kafka-starter-go/app/utils"
 )
@@ -95,26 +93,22 @@ func (r *Request) DecodeVersion4(data *bytes.Buffer) error {
 
 	var clientIdLength uint8
 	if err := utils.ReadUINT8(&clientIdLength, data); err != nil {
-		fmt.Println("While Reading the client id length")
 		return err
 	}
 
 	clientId := make([]byte, int(clientIdLength)-1)
 
 	if err := binary.Read(data, binary.BigEndian, &clientId); err != nil {
-		fmt.Println("While Reading the client id", err.Error())
 		return err
 	}
 
 	var versionLength uint8
 	if err := utils.ReadUINT8(&versionLength, data); err != nil {
-		fmt.Print("While Reading the version")
 		return err
 	}
 	version := make([]byte, int(versionLength)-1)
 
 	if err := binary.Read(data, binary.BigEndian, &version); err != nil {
-		fmt.Print("While Reading the version")
 		return err
 	}
 	r.ClientSoftwareVersion = string(version)
@@ -158,7 +152,6 @@ func Deserialize(data *bytes.Buffer) (Request, error) {
 	newRequest := Request{}
 
 	if err := newRequest.ParseRequestHeader(data); err != nil {
-		log.Println(err.Error())
 		return Request{}, err
 	}
 	if newRequest.CheckVersionValidity() == false {
@@ -167,7 +160,6 @@ func Deserialize(data *bytes.Buffer) (Request, error) {
 	if err := newRequest.ParseRequestBody(data); err != nil {
 		return Request{}, err
 	}
-	fmt.Println("New Request", newRequest)
 	return newRequest, nil
 }
 
