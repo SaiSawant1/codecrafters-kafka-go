@@ -67,7 +67,7 @@ func SerializeVersion0(req request.Request) ([]byte, error) {
 	if err := binary.Write(&body, binary.BigEndian, uint32(0)); err != nil {
 		return []byte{}, err
 	}
-	// Topic Length
+	// Topic Array Length
 	if err := binary.Write(&body, binary.BigEndian, uint8(len(req.TopicArray)+1)); err != nil {
 		return []byte{}, err
 	}
@@ -92,7 +92,7 @@ func SerializeVersion0(req request.Request) ([]byte, error) {
 		if err := binary.Write(&body, binary.BigEndian, uint8(topicNameLength+1)); err != nil {
 			return []byte{}, err
 		}
-		body.WriteString(string(topicName))
+		_, _ = body.Write([]byte(topicName))
 
 		if clusterTopic.ErrorCode == 3 {
 
@@ -102,7 +102,7 @@ func SerializeVersion0(req request.Request) ([]byte, error) {
 			}
 
 		} else {
-			if err := binary.Write(&body, binary.BigEndian, clusterTopic.TopicId); err != nil {
+			if err := binary.Write(&body, binary.BigEndian, clusterTopic.TopicId.Bytes()); err != nil {
 				return []byte{}, err
 			}
 		}
@@ -123,7 +123,7 @@ func SerializeVersion0(req request.Request) ([]byte, error) {
 				return []byte{}, err
 			}
 
-			for i := range partionsLength {
+			for i := 0; i < partionsLength; i++ {
 				partition := clusterTopic.Partitions[i]
 				binary.Write(&body, binary.BigEndian, uint16(0x0000))
 				binary.Write(&body, binary.BigEndian, uint32(partition.PartitionIndex))
@@ -159,8 +159,8 @@ func SerializeVersion0(req request.Request) ([]byte, error) {
 				for _, offlineReplicaNode := range partition.OfflineReplicaNodeIDs {
 					binary.Write(&body, binary.BigEndian, offlineReplicaNode)
 				}
+				binary.Write(&body, binary.BigEndian, uint8(0x00))
 			}
-			binary.Write(&body, binary.BigEndian, uint8(0x00))
 		}
 
 		// Topic Authorized
@@ -212,7 +212,7 @@ func SerializeVersion4(req request.Request) ([]byte, error) {
 
 	}
 
-	binary.Write(&responseBody, binary.BigEndian, uint32(0))
+	binary.Write(&responseBody, binary.BigEndian, uint32(0x00000000))
 	binary.Write(&responseBody, binary.BigEndian, uint8(0x00))
 
 	messageLength := responseHeader.Len() + responseBody.Len()

@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"time"
 
 	metadata "github.com/codecrafters-io/kafka-starter-go/app/meta-data"
 	"github.com/codecrafters-io/kafka-starter-go/app/request"
@@ -37,6 +38,7 @@ func startServer() {
 			fmt.Println("Error accepting connection: ", err.Error())
 			os.Exit(1)
 		}
+		conn.SetDeadline(time.Now().Add(10 * time.Second))
 		go handleConn(&conn)
 	}
 
