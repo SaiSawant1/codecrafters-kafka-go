@@ -3,9 +3,11 @@ package response
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 
 	metadata "github.com/codecrafters-io/kafka-starter-go/app/meta-data"
 	"github.com/codecrafters-io/kafka-starter-go/app/request"
+	"github.com/codecrafters-io/kafka-starter-go/app/utils"
 	"github.com/gofrs/uuid"
 )
 
@@ -15,29 +17,23 @@ type ApiVersion struct {
 	Max    int
 }
 
-func GetErrrorResponse(req request.Request) []byte {
-	var messageBody bytes.Buffer
-	binary.Write(&messageBody, binary.BigEndian, req.CorrelationID)
-	binary.Write(&messageBody, binary.BigEndian, uint16(35))
-
-	var errorMessage bytes.Buffer
-
-	binary.Write(&errorMessage, binary.BigEndian, uint32(messageBody.Len()))
-	binary.Write(&errorMessage, binary.BigEndian, messageBody.Bytes())
-	return errorMessage.Bytes()
-}
-
 func Serialize(req request.Request) ([]byte, error) {
 	switch req.ApiVersion {
-	case 0:
+	case utils.Describe_TOPIC_PARTITIONS:
 		res, err := SerializeVersion0(req)
 		if err != nil {
 			return nil, err
 		}
 		return res, nil
 
-	case 4:
+	case utils.API_VERSION:
 		res, err := SerializeVersion4(req)
+		if err != nil {
+			return nil, err
+		}
+		return res, nil
+	case utils.FETCH:
+		res, err := SerializeVersion16(req)
 		if err != nil {
 			return nil, err
 		}
@@ -188,6 +184,7 @@ func SerializeVersion0(req request.Request) ([]byte, error) {
 
 	return response.Bytes(), nil
 }
+
 func SerializeVersion4(req request.Request) ([]byte, error) {
 	var responseHeader bytes.Buffer
 
@@ -223,4 +220,74 @@ func SerializeVersion4(req request.Request) ([]byte, error) {
 	binary.Write(&response, binary.BigEndian, responseHeader.Bytes())
 	binary.Write(&response, binary.BigEndian, responseBody.Bytes())
 	return response.Bytes(), nil
+}
+
+func SerializeVersion16(req request.Request) ([]byte, error) {
+	var responseBody bytes.Buffer
+
+	// Write throttle_time_ms (4 bytes, int32)
+	if err := binary.Write(&responseBody, binary.BigEndian, uint32(0)); err != nil {
+		return nil, fmt.Errorf("failed to write throttle_time_ms: %v", err)
+	}
+
+	// Write error_code (2 bytes, int16)
+	if err := binary.Write(&responseBody, binary.BigEndian, uint16(0)); err != nil {
+		return nil, fmt.Errorf("failed to write error_code: %v", err)
+	}
+
+	// Write session_id (4 bytes, int32)
+	if err := binary.Write(&responseBody, binary.BigEndian, uint32(0)); err != nil {
+		return nil, fmt.Errorf("failed to write session_id: %v", err)
+	}
+
+	// Write responses field (0 elements for empty topics array)
+	// Array length is 0, so we only write the length (4 bytes, int32)
+	if err := binary.Write(&responseBody, binary.BigEndian, uint16(0)); err != nil {
+		return nil, fmt.Errorf("failed to write responses field: %v", err)
+	}
+
+	var responseHeader bytes.Buffer
+
+	// Write correlation_id (4 bytes, int32)
+	if err := binary.Write(&responseHeader, binary.BigEndian, req.CorrelationID); err != nil {
+		return nil, fmt.Errorf("failed to write correlation_id: %v", err)
+	}
+
+	// Write TAG_BUFFER field (1 byte, uint8)
+	// Assuming this is a reserved field, set to 0 for now
+	if err := binary.Write(&responseHeader, binary.BigEndian, uint8(0)); err != nil {
+		return nil, fmt.Errorf("failed to write TAG_BUFFER: %v", err)
+	}
+
+	var response bytes.Buffer
+
+	// Write total message length (4 bytes, int32)
+	totalLength := responseHeader.Len() + responseBody.Len()
+	if err := binary.Write(&response, binary.BigEndian, int32(totalLength)); err != nil {
+		return nil, fmt.Errorf("failed to write message length: %v", err)
+	}
+
+	// Write response header
+	if _, err := response.Write(responseHeader.Bytes()); err != nil {
+		return nil, fmt.Errorf("failed to write response header: %v", err)
+	}
+
+	// Write response body
+	if _, err := response.Write(responseBody.Bytes()); err != nil {
+		return nil, fmt.Errorf("failed to write response body: %v", err)
+	}
+
+	return response.Bytes(), nil
+}
+
+func GetErrorResponse(req request.Request) []byte {
+	var messageBody bytes.Buffer
+	binary.Write(&messageBody, binary.BigEndian, req.CorrelationID)
+	binary.Write(&messageBody, binary.BigEndian, uint16(35))
+
+	var errorMessage bytes.Buffer
+
+	binary.Write(&errorMessage, binary.BigEndian, uint32(messageBody.Len()))
+	binary.Write(&errorMessage, binary.BigEndian, messageBody.Bytes())
+	return errorMessage.Bytes()
 }

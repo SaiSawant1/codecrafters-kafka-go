@@ -5,6 +5,10 @@ import (
 	"encoding/binary"
 )
 
+const Describe_TOPIC_PARTITIONS = 0
+const API_VERSION = 4
+const FETCH = 16
+
 func ReadUINT8(dataField *uint8, data *bytes.Buffer) error {
 	if err := binary.Read(data, binary.BigEndian, dataField); err != nil {
 		return err

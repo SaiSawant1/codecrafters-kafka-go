@@ -22,6 +22,23 @@ type Request struct {
 	TopicArray []Topic
 }
 
+func Deserialize(data *bytes.Buffer) (Request, error) {
+	newRequest := Request{}
+
+	if err := newRequest.ParseRequestHeader(data); err != nil {
+		return Request{}, err
+	}
+	if newRequest.ApiVersion != utils.FETCH {
+		if newRequest.CheckVersionValidity() == false {
+			return newRequest, errors.New(errors.ErrUnsupported.Error())
+		}
+	}
+	if err := newRequest.ParseRequestBody(data); err != nil {
+		return Request{}, err
+	}
+	return newRequest, nil
+}
+
 func (r *Request) ParseRequestHeader(data *bytes.Buffer) error {
 	messageLength := make([]byte, 4)
 	if err := binary.Read(data, binary.BigEndian, messageLength); err != nil {
@@ -45,15 +62,26 @@ func (r *Request) ParseRequestHeader(data *bytes.Buffer) error {
 	return nil
 }
 
+func (r Request) CheckVersionValidity() bool {
+	if r.ApiVersion >= 0 && r.ApiVersion <= 4 {
+		return true
+	}
+	return false
+}
+
 func (r *Request) ParseRequestBody(data *bytes.Buffer) error {
 
 	switch r.ApiVersion {
-	case 0:
+	case utils.Describe_TOPIC_PARTITIONS:
 		if err := r.DecodeVersion0(data); err != nil {
 			return err
 		}
-	case 4:
+	case utils.API_VERSION:
 		if err := r.DecodeVersion4(data); err != nil {
+			return err
+		}
+	case utils.FETCH:
+		if err := r.DecodeVersion16(data); err != nil {
 			return err
 		}
 	}
@@ -117,11 +145,8 @@ func (r *Request) DecodeVersion4(data *bytes.Buffer) error {
 
 }
 
-func (r Request) CheckVersionValidity() bool {
-	if r.ApiVersion >= 0 && r.ApiVersion <= 4 {
-		return true
-	}
-	return false
+func (r *Request) DecodeVersion16(data *bytes.Buffer) error {
+	return nil
 }
 
 func (r *Request) ReadClientId(data *bytes.Buffer) error {
@@ -146,98 +171,4 @@ func (r Request) SkipTagBuffer(data *bytes.Buffer) error {
 		return err
 	}
 	return nil
-}
-
-func Deserialize(data *bytes.Buffer) (Request, error) {
-	newRequest := Request{}
-
-	if err := newRequest.ParseRequestHeader(data); err != nil {
-		return Request{}, err
-	}
-	if newRequest.CheckVersionValidity() == false {
-		return newRequest, errors.New(errors.ErrUnsupported.Error())
-	}
-	if err := newRequest.ParseRequestBody(data); err != nil {
-		return Request{}, err
-	}
-	return newRequest, nil
-}
-
-func NewRequestFromData(data *bytes.Buffer) (Request, error) {
-
-	var req = Request{}
-
-	var size uint32
-
-	// Read size of the message (4 bytes 32 bit unsigned int)
-	if err := binary.Read(data, binary.BigEndian, &size); err != nil {
-		return Request{}, err
-	}
-
-	// Read ApiKey of the message (2 bytes 16 bit unsigned int)
-	if err := binary.Read(data, binary.BigEndian, &req.ApiKey); err != nil {
-		return Request{}, err
-	}
-
-	// Read ApiVersion of the message (2 bytes 16 bit unsigned int)
-	if err := binary.Read(data, binary.BigEndian, &req.ApiVersion); err != nil {
-		return Request{}, err
-	}
-
-	// Read CorrelationID of the message (4 bytes 32 bit unsigned int)
-	if err := binary.Read(data, binary.BigEndian, &req.CorrelationID); err != nil {
-		return Request{}, err
-	}
-
-	if req.ApiVersion != 0 {
-		err := errors.New(errors.ErrUnsupported.Error())
-		return req, err
-	}
-
-	/*
-			   Client Id is two parts [2 bytes indicate the length of the client id].
-		      Using the length we can the client id
-	*/
-	var clientIdLength uint16
-	if err := binary.Read(data, binary.BigEndian, &clientIdLength); err != nil {
-		return Request{}, err
-	}
-	var clientId = make([]byte, clientIdLength)
-	if err := binary.Read(data, binary.BigEndian, &clientId); err != nil {
-		return Request{}, err
-	}
-	req.ClientId = string(clientId)
-
-	// Skip the tag buffer
-	var tag byte
-	if err := binary.Read(data, binary.BigEndian, &tag); err != nil {
-		return Request{}, err
-	}
-
-	var topicArrayLength byte
-	if err := binary.Read(data, binary.BigEndian, &topicArrayLength); err != nil {
-		return Request{}, err
-	}
-
-	for i := 0; i < int(topicArrayLength)-1; i++ {
-		var topic Topic
-		var topicNameLength byte
-
-		if err := binary.Read(data, binary.BigEndian, &topicNameLength); err != nil {
-			return Request{}, err
-		}
-		var topicName = make([]byte, topicNameLength-1)
-		if err := binary.Read(data, binary.BigEndian, &topicName); err != nil {
-			return Request{}, err
-		}
-		topic.TopicName = string(topicName)
-
-		req.TopicArray = append(req.TopicArray, topic)
-		var tag byte
-		if err := binary.Read(data, binary.BigEndian, &tag); err != nil {
-			return Request{}, err
-		}
-
-	}
-	return req, nil
 }

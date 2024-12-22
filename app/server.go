@@ -60,8 +60,7 @@ func handleConn(conn *net.Conn) {
 		req, err := request.Deserialize(reqData)
 		if err != nil {
 			if err.Error() == errors.ErrUnsupported.Error() {
-				errorRes := response.GetErrrorResponse(req)
-
+				errorRes := response.GetErrorResponse(req)
 				(*conn).Write(errorRes)
 				continue
 			}
@@ -69,6 +68,7 @@ func handleConn(conn *net.Conn) {
 				continue
 			}
 		}
+
 		res, err := response.Serialize(req)
 		if err != nil {
 			log.Fatalf("Failed to create response from request %s\n", err.Error())
