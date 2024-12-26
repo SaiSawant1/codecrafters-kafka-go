@@ -6,20 +6,43 @@ import (
 	"errors"
 
 	"github.com/codecrafters-io/kafka-starter-go/app/utils"
+	"github.com/gofrs/uuid"
 )
+
+type Partitions struct {
+	ParitionsIndex int32
+	LogStartOffset int64
+}
+
+type FetchTopic struct {
+	topicID    uuid.UUID
+	partitions []Partitions
+}
+
+type FetchRequest struct {
+	SessionID int32
+	Topics    []FetchTopic
+}
+type VersionRequest struct {
+	ClientId        string
+	SoftwareVersion string
+}
 
 type Topic struct {
 	TopicName string
 }
+type TopicPartitionRequest struct {
+	TopicArray []Topic
+}
 
 type Request struct {
-	ApiKey                uint16
-	ApiVersion            uint16
-	CorrelationID         uint32
-	ClientId              string
-	ClientSoftwareVersion string
+	ApiKey        uint16
+	ApiVersion    uint16
+	CorrelationID uint32
 
-	TopicArray []Topic
+	FetchRequest          *FetchRequest
+	VersionRequest        *VersionRequest
+	TopicPartitionRequest *TopicPartitionRequest
 }
 
 func Deserialize(data *bytes.Buffer) (Request, error) {
@@ -97,6 +120,8 @@ func (r *Request) DecodeVersion0(data *bytes.Buffer) error {
 		return nil
 	}
 
+	var topicArray []Topic
+
 	for i := 0; i < int(topicArrayLength)-1; i++ {
 		var topic Topic
 		var topicNameLength byte
@@ -109,9 +134,13 @@ func (r *Request) DecodeVersion0(data *bytes.Buffer) error {
 			return err
 		}
 		topic.TopicName = string(topicName)
-		r.TopicArray = append(r.TopicArray, topic)
+		topicArray = append(topicArray, topic)
 		r.SkipTagBuffer(data)
 	}
+
+	topicPartitionReq := TopicPartitionRequest{TopicArray: topicArray}
+
+	r.TopicPartitionRequest = &topicPartitionReq
 
 	return nil
 
@@ -139,13 +168,15 @@ func (r *Request) DecodeVersion4(data *bytes.Buffer) error {
 	if err := binary.Read(data, binary.BigEndian, &version); err != nil {
 		return err
 	}
-	r.ClientSoftwareVersion = string(version)
-	r.SkipTagBuffer(data)
+	clientSoftwareVersion := string(version)
+	r.
+		r.SkipTagBuffer(data)
 	return nil
 
 }
 
 func (r *Request) DecodeVersion16(data *bytes.Buffer) error {
+
 	return nil
 }
 

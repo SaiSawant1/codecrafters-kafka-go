@@ -64,14 +64,14 @@ func SerializeVersion0(req request.Request) ([]byte, error) {
 		return []byte{}, err
 	}
 	// Topic Array Length
-	if err := binary.Write(&body, binary.BigEndian, uint8(len(req.TopicArray)+1)); err != nil {
+	if err := binary.Write(&body, binary.BigEndian, uint8(len(req.TopicPartitionRequest.TopicArray)+1)); err != nil {
 		return []byte{}, err
 	}
 	// Encode Topic
-	for i := 0; i < len(req.TopicArray); i++ {
+	for i := 0; i < len(req.TopicPartitionRequest.TopicArray); i++ {
 
-		topicNameLength := len(req.TopicArray[i].TopicName)
-		topicName := req.TopicArray[i].TopicName
+		topicNameLength := len(req.TopicPartitionRequest.TopicArray[i].TopicName)
+		topicName := req.TopicPartitionRequest.TopicArray[i].TopicName
 
 		clusterTopic := metadata.GetClusterTopic(topicName)
 
