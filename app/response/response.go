@@ -19,7 +19,7 @@ type ApiVersion struct {
 
 func Serialize(req request.Request) ([]byte, error) {
 	switch req.ApiVersion {
-	case utils.Describe_TOPIC_PARTITIONS:
+	case utils.DESCRIBE_TOPIC_PARTITIONS:
 		res, err := SerializeVersion0(req)
 		if err != nil {
 			return nil, err
@@ -64,14 +64,14 @@ func SerializeVersion0(req request.Request) ([]byte, error) {
 		return []byte{}, err
 	}
 	// Topic Array Length
-	if err := binary.Write(&body, binary.BigEndian, uint8(len(req.TopicPartitionRequest.TopicArray)+1)); err != nil {
+	if err := binary.Write(&body, binary.BigEndian, uint8(len(req.DescribeTopicPartitionRequest.TopicArray)+1)); err != nil {
 		return []byte{}, err
 	}
 	// Encode Topic
-	for i := 0; i < len(req.TopicPartitionRequest.TopicArray); i++ {
+	for i := 0; i < len(req.DescribeTopicPartitionRequest.TopicArray); i++ {
 
-		topicNameLength := len(req.TopicPartitionRequest.TopicArray[i].TopicName)
-		topicName := req.TopicPartitionRequest.TopicArray[i].TopicName
+		topicNameLength := len(req.DescribeTopicPartitionRequest.TopicArray[i])
+		topicName := req.DescribeTopicPartitionRequest.TopicArray[i]
 
 		clusterTopic := metadata.GetClusterTopic(topicName)
 

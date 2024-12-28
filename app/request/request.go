@@ -6,43 +6,26 @@ import (
 	"errors"
 
 	"github.com/codecrafters-io/kafka-starter-go/app/utils"
-	"github.com/gofrs/uuid"
 )
 
-type Partitions struct {
-	ParitionsIndex int32
-	LogStartOffset int64
+type Describe_Topic_Partition_Request struct {
+	TopicArray []string
 }
-
-type FetchTopic struct {
-	topicID    uuid.UUID
-	partitions []Partitions
+type Api_Version_Request struct {
+	ClientID              string
+	clientSoftwareVersion string
 }
-
-type FetchRequest struct {
-	SessionID int32
-	Topics    []FetchTopic
-}
-type VersionRequest struct {
-	ClientId        string
-	SoftwareVersion string
-}
-
-type Topic struct {
-	TopicName string
-}
-type TopicPartitionRequest struct {
-	TopicArray []Topic
-}
+type Fetch_Request struct{}
 
 type Request struct {
 	ApiKey        uint16
 	ApiVersion    uint16
 	CorrelationID uint32
+	ClientId      string
 
-	FetchRequest          *FetchRequest
-	VersionRequest        *VersionRequest
-	TopicPartitionRequest *TopicPartitionRequest
+	DescribeTopicPartitionRequest *Describe_Topic_Partition_Request
+	ApiVersionRequest             *Api_Version_Request
+	FetchRequest                  *Fetch_Request
 }
 
 func Deserialize(data *bytes.Buffer) (Request, error) {
@@ -95,7 +78,7 @@ func (r Request) CheckVersionValidity() bool {
 func (r *Request) ParseRequestBody(data *bytes.Buffer) error {
 
 	switch r.ApiVersion {
-	case utils.Describe_TOPIC_PARTITIONS:
+	case utils.DESCRIBE_TOPIC_PARTITIONS:
 		if err := r.DecodeVersion0(data); err != nil {
 			return err
 		}
@@ -119,11 +102,9 @@ func (r *Request) DecodeVersion0(data *bytes.Buffer) error {
 	if err := utils.ReadUINT8(&topicArrayLength, data); err != nil {
 		return nil
 	}
-
-	var topicArray []Topic
+	var topicArray []string
 
 	for i := 0; i < int(topicArrayLength)-1; i++ {
-		var topic Topic
 		var topicNameLength byte
 
 		if err := binary.Read(data, binary.BigEndian, &topicNameLength); err != nil {
@@ -133,14 +114,12 @@ func (r *Request) DecodeVersion0(data *bytes.Buffer) error {
 		if err := binary.Read(data, binary.BigEndian, &topicName); err != nil {
 			return err
 		}
-		topic.TopicName = string(topicName)
+		topic := string(topicName)
 		topicArray = append(topicArray, topic)
 		r.SkipTagBuffer(data)
 	}
 
-	topicPartitionReq := TopicPartitionRequest{TopicArray: topicArray}
-
-	r.TopicPartitionRequest = &topicPartitionReq
+	r.DescribeTopicPartitionRequest.TopicArray = topicArray
 
 	return nil
 
@@ -158,6 +137,7 @@ func (r *Request) DecodeVersion4(data *bytes.Buffer) error {
 	if err := binary.Read(data, binary.BigEndian, &clientId); err != nil {
 		return err
 	}
+	r.ApiVersionRequest.ClientID = string(clientId)
 
 	var versionLength uint8
 	if err := utils.ReadUINT8(&versionLength, data); err != nil {
@@ -168,9 +148,9 @@ func (r *Request) DecodeVersion4(data *bytes.Buffer) error {
 	if err := binary.Read(data, binary.BigEndian, &version); err != nil {
 		return err
 	}
-	clientSoftwareVersion := string(version)
-	r.
-		r.SkipTagBuffer(data)
+	r.ApiVersionRequest.clientSoftwareVersion = string(version)
+
+	r.SkipTagBuffer(data)
 	return nil
 
 }
@@ -178,6 +158,7 @@ func (r *Request) DecodeVersion4(data *bytes.Buffer) error {
 func (r *Request) DecodeVersion16(data *bytes.Buffer) error {
 
 	return nil
+
 }
 
 func (r *Request) ReadClientId(data *bytes.Buffer) error {

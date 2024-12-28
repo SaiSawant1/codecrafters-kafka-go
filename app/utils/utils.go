@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 )
 
-const Describe_TOPIC_PARTITIONS = 0
+const DESCRIBE_TOPIC_PARTITIONS = 0
 const API_VERSION = 4
 const FETCH = 16
 
