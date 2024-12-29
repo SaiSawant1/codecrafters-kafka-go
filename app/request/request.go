@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/codecrafters-io/kafka-starter-go/app/utils"
+	"github.com/gofrs/uuid"
 )
 
 type Describe_Topic_Partition_Request struct {
@@ -15,7 +16,23 @@ type Api_Version_Request struct {
 	ClientID              string
 	clientSoftwareVersion string
 }
-type Fetch_Request struct{}
+
+type Fetch_Request_Partition struct {
+	PartitionID        int32
+	CurrentLeaderEpoch int32
+	FetchOffset        int64
+	LastFetchedEpoch   int32
+	LogStartOffset     int64
+	PartitionMaxBytes  int32
+}
+type Fetch_Request_Topic struct {
+	TopicID    uuid.UUID
+	Partitions []Fetch_Request_Partition
+}
+type Fetch_Request struct {
+	SessionID int32
+	Topics    []Fetch_Request_Topic
+}
 
 type Request struct {
 	ApiKey        uint16
@@ -97,6 +114,7 @@ func (r *Request) ParseRequestBody(data *bytes.Buffer) error {
 }
 
 func (r *Request) DecodeVersion0(data *bytes.Buffer) error {
+	r.DescribeTopicPartitionRequest = &Describe_Topic_Partition_Request{}
 	var topicArrayLength uint8
 
 	if err := utils.ReadUINT8(&topicArrayLength, data); err != nil {
@@ -126,7 +144,7 @@ func (r *Request) DecodeVersion0(data *bytes.Buffer) error {
 }
 
 func (r *Request) DecodeVersion4(data *bytes.Buffer) error {
-
+	r.ApiVersionRequest = &Api_Version_Request{}
 	var clientIdLength uint8
 	if err := utils.ReadUINT8(&clientIdLength, data); err != nil {
 		return err
@@ -156,6 +174,52 @@ func (r *Request) DecodeVersion4(data *bytes.Buffer) error {
 }
 
 func (r *Request) DecodeVersion16(data *bytes.Buffer) error {
+	data.Next(4 + 4 + 4 + 1)
+	fetchRequest := Fetch_Request{
+		Topics: []Fetch_Request_Topic{},
+	}
+	if err := binary.Read(data, binary.BigEndian, &fetchRequest.SessionID); err != nil {
+		return err
+	}
+	data.Next(4)
+
+	var topicLen byte
+	if err := binary.Read(data, binary.BigEndian, &topicLen); err != nil {
+		return err
+	}
+	for i := 0; i < int(topicLen); i++ {
+		buffer := make([]byte, 16)
+		if err := binary.Read(data, binary.BigEndian, &buffer); err != nil {
+			return err
+		}
+		topicId, err := uuid.FromBytes(buffer)
+		if err != nil {
+			return err
+		}
+		fetchRequestTopic := Fetch_Request_Topic{
+			TopicID: topicId,
+		}
+		var paritionLen byte
+		if err := binary.Read(data, binary.BigEndian, &paritionLen); err != nil {
+			return err
+		}
+		for j := 0; j < int(paritionLen); j++ {
+			fetchRequestPartition := Fetch_Request_Partition{}
+			binary.Read(data, binary.BigEndian, &fetchRequestPartition.PartitionID)
+			binary.Read(data, binary.BigEndian, &fetchRequestPartition.CurrentLeaderEpoch)
+			binary.Read(data, binary.BigEndian, &fetchRequestPartition.FetchOffset)
+			binary.Read(data, binary.BigEndian, &fetchRequestPartition.LastFetchedEpoch)
+			binary.Read(data, binary.BigEndian, &fetchRequestPartition.LogStartOffset)
+			binary.Read(data, binary.BigEndian, &fetchRequestPartition.PartitionMaxBytes)
+			fetchRequestTopic.Partitions = append(fetchRequestTopic.Partitions, fetchRequestPartition)
+			r.SkipTagBuffer(data)
+		}
+		fetchRequest.Topics = append(fetchRequest.Topics, fetchRequestTopic)
+		r.SkipTagBuffer(data)
+
+	}
+
+	r.FetchRequest = &fetchRequest
 
 	return nil
 

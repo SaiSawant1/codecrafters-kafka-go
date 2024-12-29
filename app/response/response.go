@@ -234,16 +234,68 @@ func SerializeVersion16(req request.Request) ([]byte, error) {
 	if err := binary.Write(&responseBody, binary.BigEndian, uint16(0)); err != nil {
 		return nil, fmt.Errorf("failed to write error_code: %v", err)
 	}
-
 	// Write session_id (4 bytes, int32)
-	if err := binary.Write(&responseBody, binary.BigEndian, uint32(0)); err != nil {
+	if err := binary.Write(&responseBody, binary.BigEndian, req.FetchRequest.SessionID); err != nil {
 		return nil, fmt.Errorf("failed to write session_id: %v", err)
 	}
-
 	// Write responses field (0 elements for empty topics array)
 	// Array length is 0, so we only write the length (4 bytes, int32)
-	if err := binary.Write(&responseBody, binary.BigEndian, uint16(0)); err != nil {
+	topicLen := len(req.FetchRequest.Topics)
+	if err := binary.Write(&responseBody, binary.BigEndian, topicLen+1); err != nil {
 		return nil, fmt.Errorf("failed to write responses field: %v", err)
+	}
+
+	for _, topic := range req.FetchRequest.Topics {
+		topicId := topic.TopicID
+		if err := binary.Write(&responseBody, binary.BigEndian, topicId.Bytes()); err != nil {
+			return nil, fmt.Errorf("failed to write responses field: %v", err)
+		}
+
+		partitionLen := len(topic.Partitions)
+		if err := binary.Write(&responseBody, binary.BigEndian, partitionLen+1); err != nil {
+			return nil, err
+		}
+
+		for _, _ = range topic.Partitions {
+			if err := binary.Write(&responseBody, binary.BigEndian, int32(0)); err != nil {
+				return nil, fmt.Errorf("failed to write responses field: %v", err)
+			}
+			if err := binary.Write(&responseBody, binary.BigEndian, int16(100)); err != nil {
+				return nil, fmt.Errorf("failed to write responses field: %v", err)
+			}
+
+			// high_watermark
+			if err := binary.Write(&responseBody, binary.BigEndian, int64(0)); err != nil {
+				return nil, err
+			}
+			// last_stable_offset
+			if err := binary.Write(&responseBody, binary.BigEndian, int64(0)); err != nil {
+				return nil, err
+			}
+			// log_start_offset
+			if err := binary.Write(&responseBody, binary.BigEndian, int64(0)); err != nil {
+				return nil, err
+			}
+			// preferred_read_replica
+			if err := binary.Write(&responseBody, binary.BigEndian, int32(0)); err != nil {
+				return nil, err
+			}
+			if err := binary.Write(&responseBody, binary.BigEndian, int8(0)); err != nil {
+				return nil, err
+			}
+			// Tag_buffer
+			if err := binary.Write(&responseBody, binary.BigEndian, int16(0)); err != nil {
+				return nil, err
+			}
+		}
+		// Tag_buffer
+		if err := binary.Write(&responseBody, binary.BigEndian, int16(0)); err != nil {
+			return nil, err
+		}
+
+	}
+	if err := binary.Write(&responseBody, binary.BigEndian, int16(0)); err != nil {
+		return nil, err
 	}
 
 	var responseHeader bytes.Buffer
